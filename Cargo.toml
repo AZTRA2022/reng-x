@@ -1,0 +1,12 @@
+[package]
+name = "reng-x"
+version = "0.1.0"
+edition = "2024"
+
+
+[dependencies] # signatures Ed25519
+heapless = "0.8"                               # buffers sans allocation
+anyhow = "1"
+rand = "*"
+tokio = { version = "1", features = ["full"] }
+macroquad = "0.4.15"
