@@ -1,1 +1,1 @@
-self.sh + self.sw
+100

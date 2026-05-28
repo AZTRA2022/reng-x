@@ -1,48 +1,78 @@
-use std::ops::Mul;
+use std::f32::consts::PI;
 
-use macroquad::{miniquad::BufferUsage::Stream, prelude::*, telemetry::frame};
+use macroquad::prelude::*;
 extern crate rand;
-use rand::{RngExt, fill};
-
-fn gen_array(length: Option<usize>) -> Vec<f32> {
-    let mut arr: Vec<f32> = Vec::with_capacity(length.unwrap());
-    for _ in 0..length.unwrap() {
-        arr.push(rand::random_range(0.0..=550.0));
-    }
-    arr
-}
-
-fn draw_bar() {}
+use rand::RngExt;
 
 #[derive(Debug, Clone, Copy)]
 struct Dim {
-    pub x: f32,
-    pub y: f32,
-    pub width: f32,
-    pub height: f32,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct Bar {
-    pub color: Color,
-    pub dim: Dim,
-    pub value: f32,
+    color: Color,
+    dim: Dim,
+    value: f32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct Plane {
-    pub data: Vec<f32>,
-    pub bars: Option<Vec<Bar>>,
-    pub sw: f32,
-    pub sh: f32,
-    pub gradient: f32,
-    pub print_data: bool,
-    pub index: bool,
+    data: Vec<f32>,
+    bars: Vec<Bar>,
+    sw: f32,
+    sh: f32,
+    print_data: bool,
+    index: bool,
 }
 
 impl Plane {
-    fn draw_bars(&mut self) {
-        for bar in self.clone().bars.unwrap() {
+    fn colorizer(value: f32) -> Color {
+        match value {
+            v if v < 50.0 => BLUE,
+            v if v < 100.0 => GREEN,
+            v if v < 150.0 => YELLOW,
+            v if v < 200.0 => ORANGE,
+            _ => RED,
+        }
+    }
+
+    fn rebuild_bars(&mut self) {
+        self.sw = screen_width();
+        self.sh = screen_height();
+        self.bars.clear();
+
+        let data_size = self.data.len();
+        let max_value = self.data.iter().copied().fold(1.0_f32, f32::max);
+
+        let index_margin = if self.index { 80.0 } else { 0.0 };
+        let available_height = self.sh - index_margin;
+
+        let bar_width = self.sw / data_size as f32;
+
+        for (n, &item) in self.data.iter().enumerate() {
+            let bar_height = (item / max_value) * available_height;
+
+            let dim = Dim {
+                x: n as f32 * bar_width,
+                y: self.sh - bar_height,
+                width: bar_width,
+                height: bar_height,
+            };
+
+            self.bars.push(Bar {
+                dim,
+                color: Self::colorizer(item),
+                value: item,
+            });
+        }
+    }
+
+    fn draw(&self) {
+        for bar in &self.bars {
             draw_rectangle(
                 bar.dim.x,
                 bar.dim.y,
@@ -50,104 +80,72 @@ impl Plane {
                 bar.dim.height,
                 bar.color,
             );
+
             if self.index {
-                draw_text(
-                    format!("{}", bar.value),
-                    bar.dim.x,
-                    bar.dim.y - 10.0,
-                    12.0,
-                    Self::colorizer(bar.value),
-                );
-            }
-            if self.print_data {
-                draw_text(
-                    format!("{:?}", &self.data.clone()[0..=9]),
-                    10.0,
-                    10.0,
-                    16.0,
-                    Self::colorizer(self.data[0]),
+                draw_text_ex(
+                    &format!("{:.1}", bar.value),
+                    bar.dim.x + bar.dim.width / 3.0,
+                    bar.dim.y - 5.0,
+                    TextParams {
+                        font_size: 13,
+                        rotation: PI / 2.0,
+                        color: WHITE,
+                        ..Default::default()
+                    },
                 );
             }
         }
-        Self::refresh(self);
-    }
 
-    fn colorizer(value: f32) -> Color {
-        match value {
-            v if v < 25.0 => DARKBLUE,
-            v if v < 50.0 => BLUE,
-            v if v < 75.0 => SKYBLUE,
-            v if v < 100.0 => DARKGREEN,
-            v if v < 125.0 => GREEN,
-            v if v < 150.0 => LIME,
-            v if v < 175.0 => DARKPURPLE,
-            v if v < 200.0 => PURPLE,
-            v if v < 225.0 => VIOLET,
-            v if v < 250.0 => MAGENTA,
-            v if v < 275.0 => PINK,
-            v if v < 300.0 => BEIGE,
-            v if v < 325.0 => LIGHTGRAY,
-            v if v < 350.0 => GRAY,
-            v if v < 375.0 => DARKGRAY,
-            v if v < 400.0 => BROWN,
-            v if v < 425.0 => DARKBROWN,
-            v if v < 450.0 => YELLOW,
-            v if v < 475.0 => GOLD,
-            v if v < 500.0 => ORANGE,
-            v if v < 525.0 => MAROON,
-            _ => RED,
+        if self.print_data {
+            let preview = &self.data[..self.data.len().min(10)];
+
+            draw_text(&format!("{:?}", preview), 10.0, 20.0, 20.0, WHITE);
         }
     }
 
-    fn init(&mut self) {
-        let data_size = self.data.len();
-        let mut n = 0;
-        for item in self.data.clone() {
-            let _x = n as f32 * (self.sw / data_size as f32);
-            let _y = self.sh - (item / 2.0);
-            let bar_dim = Dim {
-                x: _x,
-                y: _y,
-                width: self.sw / data_size as f32,
-                height: (item),
-            };
-            // dbg!(self.gradient.clone());
-            let bar = Bar {
-                dim: bar_dim,
-                color: Self::colorizer(item),
-                value: item,
-            };
-            let bars = self.bars.as_mut().unwrap();
-            self.gradient = (self.sh + self.sw) * 5.0;
-            bars.push(bar);
-            n += 1;
+    #[allow(unused)]
+    fn mutate_array(&mut self) {
+        let mut rng = rand::rng();
+
+        for item in &mut self.data {
+            let variation = rng.random_range(-2.0..=2.0);
+
+            *item += variation;
+
+            *item = item.clamp(10.0, 500.0);
         }
     }
-    fn refresh(&mut self) {
-        self.sw = screen_width();
-        self.sh = screen_height();
-        self.bars.as_mut().unwrap().clear();
-    }
+}
+
+fn gen_array(length: usize) -> Vec<f32> {
+    let mut rng = rand::rng();
+
+    (0..length)
+        .map(|_| rng.random_range(10.0..=255.0))
+        .collect()
 }
 
 #[macroquad::main("Diagram")]
 async fn main() {
-    let array = gen_array(Some(50));
-    dbg!(array.clone());
-
     let mut plane = Plane {
-        data: array,
-        bars: Some(Vec::new()),
+        data: gen_array(25),
+        bars: Vec::with_capacity(25),
         sw: 0.0,
         sh: 0.0,
-        gradient: 0.0,
         print_data: true,
         index: true,
     };
+
     loop {
         clear_background(BLACK);
-        plane.init();
-        plane.draw_bars();
+
+        plane.rebuild_bars();
+
+        plane.draw();
+
+        plane.mutate_array();
+
         next_frame().await;
+        draw_fps();
     }
 }
