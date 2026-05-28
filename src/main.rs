@@ -1,24 +1,54 @@
+use clap::Parser;
 use macroquad::prelude::*;
 pub mod view;
 use view::*;
-#[allow(unused)]
-const TXT_TEST_FILE: &'static str = "/home/aztra/codes/reng-x/src/test.txt";
-const CSV_TEST_FILE: &'static str = "/home/aztra/Bureau/test.csv";
+
+#[derive(Parser, Debug)]
+#[command(name = "reng-x", about = "Visualiseur de données en barres")]
+struct Args {
+    #[arg(short, long)]
+    file: Option<String>,
+
+    #[arg(short, long, default_value_t = 1)]
+    column: i32,
+
+    #[arg(short, long)]
+    random: bool,
+
+    #[arg(short = 'n', long, default_value_t = 25)]
+    count: usize,
+
+    #[arg(long)]
+    no_index: bool,
+
+    #[arg(long)]
+    no_print: bool,
+}
 
 #[macroquad::main("Diagram")]
 async fn main() {
-    let data_1 = read_from::<f32>(&FileExt::CSV(CSV_TEST_FILE, 1));
-    dbg!(&data_1);
-    let data_2 = gen_array(25);
+    let args = Args::parse();
+
+    let data = if args.random || args.file.is_none() {
+        gen_array(args.count)
+    } else {
+        let path = args.file.as_deref().unwrap();
+        if path.ends_with(".csv") {
+            read_from::<f32>(&FileExt::CSV(path, args.column))
+        } else {
+            read_from::<f32>(&FileExt::TXT(path))
+        }
+    };
+
     let mut plane = View {
-        data: data_1,
-        bars: Vec::with_capacity(25),
+        bars: Vec::with_capacity(data.len()),
         sw: 0.0,
         sh: 0.0,
-        print_data: true,
-        index: true,
+        print_data: !args.no_print,
+        index: !args.no_index,
+        data,
     };
-    // let file = File::open("test.txt");
+
     loop {
         clear_background(BLACK);
         plane.rebuild_bars();
